@@ -1,0 +1,608 @@
+```{r, eval=TRUE}
+library(SMPracticals)
+library(stats4)
+```
+# Likelihood
+
+
+## 1. Rounding
+
+Following Example 4.21, we assess the effect of rounding on the usual
+estimates for a normal random sample $Y_1, \ldots, Y_n$, rounded to $X_1,
+\ldots, X_n$.  The rounded data have average and variance $\overline{X}$ and
+$S^2 = (n − 1)^{−1} (X_j − X)^2$, whose means are $\kappa_1$ and $\kappa_1$,
+where the  $\kappa_r$ are the cumulants of $X$. Their variances are  $\kappa_2
+/ n$ and $\kappa_4 / n + 2 \kappa_2^2 / (n - 1)$.  The following function
+calculates the efficiencies and means of these estimators relative to those
+based on $Y_1, \ldots, Y_n$, when the $Y_j \sim N(\mu, \sigma^2)$.
+
+```{r, eval=FALSE}
+I.moments <- function(delta, n=10, m=0, s=1, dig=4) {
+    k <- seq(from=-5,to=5,by=delta)
+    pi <- pnorm( (k+0.5*delta-m)/s ) - pnorm( (k-0.5*delta-m)/s )
+    k1 <- sum(pi*k); k2 <- sum(pi*k^2)
+    k3 <- sum(pi*k^3); k4 <- sum(pi*k^4)
+    k4 <- k4 - 4*k1*k3 - 3*k2^2 + 12*k1^2*k2 - 6*k1^4
+    k3 <- k3 - 3*k1*k2+2*k1^3
+    k2 <- k2 - k1^2
+    eff.m <- s^2/k2
+    eff.v <- (2*s^4/(n-1))/(k4/n + 2*k2^2/(n-1))
+    round(c(100*eff.m,100*eff.v,k1,k2),digits=dig)
+}
+I.moments(0.01)
+```
+
+Read the function carefully to check it works as advertized.  Obtain the
+efficiencies for various values of $\delta / \sigma$ and $n$. Is Table 4.2 of
+the book misleading?
+
+
+## 2. Births
+
+Births contains the data in Table 2.1 on times spent on delivery suite by 95
+women. A possible model for these data is that the number of women arriving
+each day is Poisson, with mean $\theta$, and that the time spent by each of
+them has a gamma distribution with mean $\mu$ and shape parameter $\alpha$.
+
+(a) For a sample $m_1, \ldots, m_n$ from the Poisson distribution $f(m;
+\theta) = \theta^m e^{-\theta} / m!, \qquad \theta \lt 0, m = 0, 1, \ldots$
+find the maximum likelihood estimate and gives its asymptotic variance.
+
+**Answer:** The log likelihood is $l(\theta) = \log \mathcal{L}(\theta) = -n
+\theta + \log \theta \sum_{i=1}^n m_i$, omitting the constant term
+corresponding to $m!$.  From the likelihood equation $0 = l'(\hat{\theta}) =
+-n + \hat{\theta}^{-1} \sum_i m_i$, the m.l.e. is $\hat{\theta} = n^{-1}
+\sum_i m_i = \overline{m}$, the average number of arrivals a day.  The Fisher
+information of $\theta$ is $I(\theta) = - \mathrm{E} l^{(2)}(\theta) =
+\theta^{-2} \sum_i \mathrm{E} m_i = n / \theta$, so the m.l.e. $\hat{\theta}$
+has variance of $\sigma^2_{\hat{\theta}} = I^{-1} (\hat{\theta}) =
+\overline{m} / n$, which tends to zero as $n \rightarrow \infty$.
+
+(b) Show that the gamma distribution parametrized as
+
+$f(y; \mu, \alpha) = [\Gamma(\alpha) \mu^{\alpha}]^{-1} \alpha^{\alpha}
+y^{\alpha - 1} \exp(- \alpha y / \mu), \qquad \alpha, \mu \lt 0, y \lt 0$
+
+has mean $\mu$ and variance $\mu^2 / \alpha$, and find the information matrix
+$I(\mu, \alpha)$ based on a sample $y_1 , \ldots, y_n$. Show that given
+$\alpha$, the maximum likelihood estimate of $\mu$ is $\hat{\mu}_{\alpha} =
+\overline{y}$, and hence verify that the following S-Plus functions yield the
+profile log likelihood $\log \mathcal{L}_p(\alpha) = \log
+\mathcal{L}_p(\alpha, \hat{\mu}_{\alpha})$:
+
+```{r, eval=FALSE}
+logL.gam <- function(alpha, y) {
+    muhat <- mean(y)
+    L <- dgamma( alpha*y/muhat, shape=alpha )*alpha/muhat
+    -sum(log(L))
+}
+```
+
+**Answer to reparametrization:** in general, reparametrization of parameter
+$\theta$ with the one to one function $\psi$ has no effect on the p.d.f.:
+$f(y; \theta) = f(y; \psi(\theta))$.  In the present case $\theta = (\alpha,
+\beta)$ and $\psi(\theta) = (\alpha, \mu)$, where $\mu = \alpha / \beta$.  S
+ince $\mathrm{E} Y = \alpha / \beta$, the parameter $\mu$ can be interpreted
+as the mean birthtime.  Moreover, $\mathrm{var}Y = \alpha / \beta^2 = \mu^2 /
+\alpha$, where the first equation is well-known expression for the variance,
+so the second equation also holds.
+
+**Answer to profile likelihood:** The log likelihood is $l(\mu,
+\alpha) = n [ -\log \Gamma(\alpha) + \alpha (\log \alpha - \log \mu) ] +
+\sum_{i=1}^n [ (\alpha - 1) \log y_i - \alpha \mu^{-1} y_i ]$.
+
+The first order derivatives, giving the components of the score vector $U(\mu,
+\alpha)$, are:
+
+$\partial l / \partial \mu = \alpha \mu^{-1} (\mu^{-1} \sum_i y_i - n)$
+
+$\partial l / \partial \alpha = n [ - \Gamma^{-1}(\alpha) \Gamma'(\alpha) +
+\log \alpha - \log \mu + 1 ] + \sum_i (\log y_i - \mu^{-1} y_i)$
+
+Given $\alpha$ the m.l.e. of $\mu$ is obtained from the likelihood equation
+$\partial l / \partial \mu = 0$ so $\hat{\mu} = \alpha \alpha^{-1} n^{-1}
+\sum_i y_i = \overline{y}$, giving the average time in the delivery suite.
+The calculation shows that $\hat{\mu}$ is independent of $\alpha$, which
+illustrates the usefullness of the $(\mu, \alpha)$ parametrization.
+
+**Answer to the R/S-Plus function:** the profile likelihood $\log
+\mathcal{L}_p(\alpha, \hat{\mu}_{\alpha})$ corresponds to the distribution
+$Y_p \sim \mathrm{Gamma}_{\alpha, \hat{\mu}}(\alpha, \hat{\mu})$ with pdf
+$f_{y; \alpha, \mu}(y; \alpha, \hat{\mu})$.  Reparametrization gives $Y_p \sim
+\mathrm{Gamma}_{\alpha, \beta}(\alpha, \alpha / \hat{\mu})$, and as in the
+case of all 1-1 reparametrizations, the pdf is unchanged: $f_{y; \alpha,
+\beta}(y; \alpha, \alpha / \hat{\mu}) = f_{y; \alpha, \mu}(y; \alpha,
+\hat{\mu})$.  Changing from variable $Y_p$ to $Z_p = \zeta(Y_p) = \alpha /
+\hat{\mu} Y$ corresponds to a $\alpha / \hat{\mu}$-fold increase in scaling or
+equivalently a $\alpha / \hat{\mu}$-fold decrease in inverse scaling.
+Therefore $Z_p \sim \mathrm{Gamma}_{\alpha, \beta}(\alpha, 1)$ and the following identities hold:
+
+$f_{z; \alpha, \beta}(z; \alpha, 1) = f_{y; \alpha, \beta}(\zeta (y); \alpha,
+1) | \zeta' (y) | = f_{y; \alpha, \beta}(y \alpha / \hat{\mu}; \alpha, 1)
+\alpha / \hat{\mu}$.
+
+The right size of the second equation is exactly what the 3rd line of the
+logL.gam function expresses.
+
+**Answer to Fisher information:** the second order derivatives of the log
+likelihood are:
+
+$\partial^2 l / \partial \mu^2 = \alpha \mu^{-2} (n - 2 \mu^{-1} \sum_i y_i) = \alpha \mu^{-2} (-n)$
+
+$\partial^2 l / \partial \mu \partial \alpha = \partial^2 l / \partial \alpha
+\partial \mu = \mu^{-1} (\mu^{-1} \sum_i y_i - n) = \mu^{-1} (n - n) = 0$
+
+$\partial^2 l / \partial \alpha^2 = n [ \Gamma^{-2}(\alpha) \Gamma^{(1)}(\alpha) -
+\Gamma^{-1}(\alpha) \Gamma^{(2)}(\alpha) + \alpha^{-1} ]$
+
+The Fisher information matrix is $I(\mu, \alpha) = - \mathrm{E}
+\partial^2 l / \partial(\mu, \alpha)^2$.  Then 
+
+$I_{11} = \mu^{-2} \alpha n \qquad I_{21} = 0$
+
+$I_{12} = 0 \qquad I_{22} = - \partial^2 l / \partial \alpha^2.$
+
+It can be seen that $\mathrm{var}\hat{\mu} = I_{11}^{-1} = n^{-1} \mu^2 /
+\alpha = n^{-1} \mathrm{var}Y$, which means that the variance of the
+m.l.estimator $\hat{\mu}$ converges to zero as $n \rightarrow \infty$.
+
+
+c) Now apply the ideas from (a) and (b) to the birth data:
+
+```{r, eval=FALSE}
+data(births)
+fit <- nlm(logL.gam, 1, hessian=TRUE, y=time)
+alphahat <- fit$estimate
+# sqrt(diagonal of inverse hessian)
+se.alphahat <- sqrt(diag(solve(fit$hessian)))
+muhat <- mean(time)
+```
+
+to obtain the maximum likelihood estimates. Obtain the standard error for
+$\mu$, and give 95% confidence intervals for $\theta, \alpha$, and $\mu$.
+
+**Answer:** the standard error for the mean arrival time is $\sigma_{\theta} =
+(\theta / n)^{1/2}$ so the 95% confidence interval for $\theta$ based on
+$\sigma_{\hat{\theta}} = \overline{y}^{-1} (\alpha n)^{-1/2}$ is
+$(\overline{m} - \sigma_{\hat{\theta}} z_{0.975}, \overline{m} +
+\sigma_{\hat{\theta}} z_{0.025})$.  The 95% confidence region for $(\mu,
+\alpha)$ is the ellipsoid satisfying $(\hat{\mu} - \mu, \hat{\alpha} -
+\alpha)^T I(\hat{\mu}, \hat{\alpha}) (\hat{\mu} - \mu, \hat{\alpha} - \alpha)
+\le c_2(0.95)$ with $\hat{\mu} = \overline{y}$.  This confidence region is
+demarcated by a heavy solid line in the contour plot below.
+
+### Alternative implementation with S4 fit object
+
+The resulting "fit" is a "mle-class" S4 object using "mle" from the stats4
+package.
+
+```{r, eval=TRUE}
+birth <- list()
+birth$time <- SMPracticals::births$time
+birth$negLL <- function(mu = 1, alpha = 1, y = 1) {
+    L <- dgamma(y * alpha / mu, shape=alpha) * alpha / mu
+    # or equivalently:
+    # L <- dgamma(y, shape=alpha, rate=alpha/mu)
+    -sum(log(L))
+}
+
+# list for ML fit results
+birth$fit <- list()
+# profile likelihood of alpha, keeping mu fixed 
+birth$fit$alpha <- mle(birth$negLL, fixed = list(mu = mean(birth$time), y =
+                                              birth$time))
+# profile likelihood of mu, keeping alpha fixed 
+birth$fit$mu <- mle(birth$negLL, fixed = list(alpha = birth$fit$alpha@coef,
+                       y = birth$time))
+# joint likelihood of mu and alpha
+birth$fit$mu_alpha <- mle(birth$negLL, fixed = list(y = birth$time))
+
+# preliminary plots suggested to focus on this rectangle of mu x alpha
+birth$lims <- list()
+birth$lims$mu = seq(6.5, 9.5, length.out=30)
+birth$lims$alpha = seq(2.5, 7, length.out=30)
+
+# evaluate birthsLL at points of the grid birth$lims$mu x birth$lims$alpha
+birth$llgrid <- outer(birth$lims$mu, birth$lims$alpha,
+                # outer function makes birthsLL accept vector mus and alphas
+                FUN = function(mus, alphas, y=birth$time)
+                # inner function ensures that the entire y data vector is used
+                # at each point-pair (m, a) of vector pair (mus, alphas)
+                # note coercion from type list to double, required by contour
+                as.double(Map(function(m, a) -birth$negLL(m, a, y=y),
+                    mus, alphas)))
+```
+
+(d) Gamma probability plot to assess the quality of the model:
+
+```{r, eval=TRUE, fig.align="center", fig.width=12}
+par(pty = "s", mfrow = c(1, 2), cex = 1)
+# contour plot with dotted levels
+contour(x = birth$lims$mu, y = birth$lims$alpha, z = birth$llgrid, lty = "dotted",
+        xlab = expression(mu), ylab = expression(alpha),
+        main = "log-likelihood for birth times")
+# thick solid level demarcating 95% confidence region
+contour(x = birth$lims$mu, y = birth$lims$alpha, z = birth$llgrid,
+        levels = - birth$fit$mu_alpha@min - 1/ 2 *qchisq(0.95, df=2),
+        add = TRUE, lty = "solid", lwd = 2, drawlabels = FALSE)
+# the m.l.e of mu is the sample average independently of alpha
+abline(v = mean(birth$time), lty = "dashed")
+abline(h = birth$fit$alpha@coef, lty = "dashed")
+points(t(as.matrix(birth$fit$mu_alpha@coef)))
+
+birth$n <- length(birth$time)
+birth$alphahat <- birth$fit$alpha@coef
+qqplot(mean(birth$time)*qgamma(c(1:birth$n)/(birth$n+1), shape=birth$alphahat)/birth$alphahat,
+       birth$time, xlab="quantile of fitted gamma distribution",
+       ylab="ordered birth times",
+       main="Gamma probability plot")
+abline(0,1,lty=2)
+```
+
+The **contour plot** shows the log-likelihood of the mean birth time $\mu$ and the
+shape parameter $\alpha$.  The 95% confidence region based on the $\chi_2^2$
+approximation of the relative log-likelihood is demarcated by a heavy solid
+line in the contour plot below.  The m.l.e. $(\hat{\mu}, \hat{\alpha})$ is
+shown as a hollow circle; the dashed vertical line marks $\hat{\mu} =
+\overline{y}$, the average birth time, while the dashed horizontal line marks
+$\hat{\alpha}$, obtained by numerical optimization of the profile
+log-likelihood $\log \mathcal{L}_p(\alpha)$.
+
+The **probability plot** suggests that the gamma distribution, with parameters
+estimated by maximum likelihood, provides an excellent model to the birth
+times.
+
+(Sections 4.1–4.4)
+
+
+## 3. Group size distribution
+
+Once upon a time, on a spring afternoon in Portland, Oregon, these data were
+collected on the sizes of different groups of people in the park, in the
+street, and so forth:
+
+    Group size y       1     2     3     4     5     6
+    Frequency n     1486   694   195    37    10     1
+
+A possible model is that the group sizes have truncated Poisson density
+
+$f(y; \theta) = \theta^y e^{-\theta} / [ y! (1 - e^{-\theta}) ], \qquad y = 1,
+2, \ldots, \quad \theta \lt 0.$
+
+To plot the log likelihood $l(\theta)$ over $0.1 \leq \theta \leq 2$:
+
+```{r, eval=TRUE, fig.align="center"}
+group <- list()
+
+group$size <- c(1:6)
+group$freq <- c(1486,694,195,37,10,1)
+# x is theta
+group$negLL <- function(theta=1, size=group$size, freq=group$freq) {
+    f <- dpois(size,theta)/(1-dpois(0,theta)) # dpois is Poisson PDF
+    -sum(freq*log(f))
+}
+
+plot(group$thetas <- seq(from=0.1, to=2, length.out=200),
+     sapply(group$thetas, function(x) -group$negLL(x)),
+     xlab = expression(theta), ylab = "log-likelihood",
+     main = expression(paste("Poisson model with parameter ", theta)), type = "l")
+```
+
+You may like to plot this on a smaller interval. What values of $\theta$ seem
+plausible?  To minimize $−\log \mathcal{L}(\theta)$ using nlm, find the
+observed information $J(\hat{\theta})$ numerically and the 95% confidence
+interval using $Z_1(\theta) = J(\hat{\theta})^{-1/2} (\hat{\theta} −
+\theta)$:
+
+```{r, eval=TRUE}
+group$fit <- mle(group$negLL, fixed = list(size=group$size, freq=group$freq))
+group$fit@coef # theta hat, m.l.e. of theta
+group$fit@vcov # variance of theta hat
+# 95% confidence interval based on thetahat
+(group$CI95Z <- group$fit@coef - sqrt(group$fit@vcov) * qnorm(c(0.975,
+                                                                0.025)))
+
+```
+
+For a 95% confidence interval based on the signed likelihood ratio statistic
+$Z_{2}(\theta) = \mathrm{sign}(\hat{\theta} − \theta)w(\theta) 1/2$:
+
+```{r, eval=TRUE, fig.align="center"}
+group$thetas <- seq(from=0.8, to=1, length.out=200)
+group$L <- sapply(group$thetas, function(x) -group$negLL(x))
+group$W <- -2 * (group$fit@min + group$L)
+group$signedZ <- sign(group$fit@coef-group$thetas)*sqrt(group$W)
+
+plot(group$thetas, group$signedZ,type="l", xlab = expression(theta),
+     ylab = expression(paste(Z[1], " and ", Z[2])),
+     main = expression("95% confidence intervals"))
+lines(group$thetas,(group$fit@coef-group$thetas)/sqrt(group$fit@vcov),lty=2)
+abline(h = qnorm(c(0.025, 0.975)), lty = 3)
+abline(h = 0, lty = 4)
+abline(v = group$CI95Z, lty = 3)
+abline(v = group$fit@coef, lty = 4)
+```
+
+**The plot** demonstrates a close agreement between the $Z_2(\theta)$ (solid
+diagonal line) and $Z_1(\theta)$ (dashed diagonal line) pivot statistics.
+Equality between these two statistics holds at the m.l.e. $\theta = \hat{\theta}$
+(dashed-dotted vertical line), where both $Z_2(\theta)$ and $Z_1(\theta)$ are
+zero (dashed-dotted horizontal line).  The 95% confidence interval for
+$\theta$ based on $Z_1(\theta)$ is shown by the vertical dotted lines.
+
+What do you deduce from the close agreement between the diagonal lines showing
+$Z_2(\theta)$ and $Z_1(\theta)$ in the range of interest? Does your deduction
+agree with the confidence interval obtained from the likelihood ratio
+statistic, by lik.ci(theta, L)?
+
+```{r, eval=TRUE}
+lik.ci(group$thetas, group$L)
+```
+
+**Answer:** The close agreement between $Z_2(\theta)$ and $Z_1(\theta)$
+suggests that the log-likelihood ratio (or relative log likelihood) is well
+approximated by the $\chi^2_1$ distribution, further suggesting that the m.l.e.
+$\hat{\theta}$ is close to the true $\theta^0$ and that the sample size is
+large enough for the normal approximation:
+$J^{-1/2}(\hat{\theta})(\hat{\theta} - \theta^0) \sim N(0, 1)$.
+
+For a chi-squared goodness of fit statistic:
+
+```{r, eval=TRUE}
+group$E <- sum(group$freq)*dpois(group$size,group$fit@coef)/(1-dpois(0,group$fit@coef))
+group$P <- sum( (group$freq-group$E)^2/group$E ) # Pearson’s statistic
+(group$chisq_df = length(group$size) - (1 + length(group$fit@coef))) # df
+pchisq(group$P, df = group$chisq_df, lower.tail = FALSE) # p-value / signif. level
+```
+
+How many degrees of freedom has this? To get the significance level,
+1-pchisq(P,df), where df is your chosen value. Is the fit good?
+
+**Answer:**  the degrees of freedom equals the number of categories minus the
+number of parameters minus one: $df = 6 - (1 + 1) = 4$.  The significance
+level (p-value) of the test statistic is larger than 1/2 suggesting that the
+data fits very well to the Poisson model.
+
+(Sections 4.1–4.5)
+
+
+## Rutherford and Geiger 
+
+The data below are from an experiment of Rutherford and Geiger in which the
+number
+of $\alpha$-particles registered by a counter in periods of one-eighth of a minute
+were recorded;
+n represents the number of particles and y the number of times n was observed:
+
+    n     0     1     2     3     4     5     6     7     8     ≥ 9     Total
+    y    57   203   383   525   532   408   273   139    45      43      2608 
+
+On the supposition that the events form a Poisson process of rate $8\lambda$
+events per minute, show that the probability of 9 or more events is $\exp(-
+\lambda) \sum_{r=9}^{\infty} \lambda^r /r!$, and hence write down the
+likelihood for the observed data. Maximize it numerically and give a
+confidence interval for $8 \lambda$. How well does the model fit?
+
+### Theory
+
+The countably infinite sample space of a Poisson distribution is transformed
+into a finite sample space of size 10 as a consequence of pooling all
+elementary events $r=9, 10, \ldots$ number of particles counted, into a single
+event $r \geq 9$.  This kind of finiteness turns the Poisson distribution into
+a multinomial distribution with denominator 10, with categories $r = 0,
+\ldots, 8, \geq 9$.  For $r = 0, \ldots, 8$ the p.m.f. $f(r; \lambda) = \Pr(R =
+r)$ is that of a Poisson with rate parameter $\lambda$.  In contrast, $f(\geq
+9; \lambda) = \Pr(R \geq 9) = 1 - F(8; \lambda) = \exp(- \lambda)
+\sum_{r=9}^{\infty} \lambda^r /r$, where $F$ is the c.d.f. of the Poisson
+distribuiton, which implies the last equality, and therefore the proposed
+equality holds.
+
+Because $\lambda$ corresponds to the scale of one-eight of a minute, taking
+$\theta = 8 \lambda$ will correspond to the minute scale.  Therefore the "rgpois"
+likelihood function below is parametrized with $\theta$ but calls the "dpois"
+and "ppois" functions with $\theta / 8$.
+
+```{r, echo=FALSE, eval=TRUE}
+counts_likelihood <- function(categ, freq, negLLfun, lim) {
+    res <- list()
+
+    res$categ <- categ
+    res$freq <- freq
+    # x is theta
+    res$negLLfun <- negLLfun 
+    res$lim <- lim
+
+    res$negLL <- function(theta=1, categ=res$categ, freq=res$freq) {
+        f <- negLLfun(categ, theta)
+        -sum(freq*log(f))
+    }
+
+    res$avg <- sum(freq * categ) / sum(freq)
+    res$sem <- sqrt(res$avg / sum(freq))
+    res$thetas <- seq(from=res$lim[1],
+                      to=res$lim[2], length.out=200)
+    par(mfrow = c(1, 2), cex=1)
+    plot(res$thetas,
+         sapply(res$thetas, function(x) -res$negLL(x)),
+         xlab = expression(theta), ylab = "log-likelihood",
+         main = expression(paste("Poisson model with parameter ", theta)), type = "l")
+
+    res$fit <- mle(res$negLL, fixed = list(categ=res$categ, freq=res$freq))
+    res$CI95Z <- res$fit@coef - sqrt(res$fit@vcov) * qnorm(c(0.975, 0.025))
+    res$L <- sapply(res$thetas, function(x) -res$negLL(x))
+    res$W <- -2 * (res$fit@min + res$L)
+    res$signedZ <- sign(res$fit@coef-res$thetas)*sqrt(res$W)
+
+    plot(res$thetas, res$signedZ,type="l", xlab = expression(theta),
+         ylab="signed LR and Z statistic",
+         main = expression("95% confidence intervals"))
+    lines(res$thetas,(res$fit@coef-res$thetas)/sqrt(res$fit@vcov),lty=2)
+    abline(h = qnorm(c(0.025, 0.975)), lty = 3)
+    abline(h = 0, lty = 4)
+    abline(v = res$CI95Z, lty = 3)
+    abline(v = res$fit@coef, lty = 4)
+
+    res$E <- sum(res$freq) * res$negLLfun(res$categ, res$fit@coef)
+    res$OE <- rbind(res$freq, res$E)
+    dimnames(res$OE) <- list(r = c("observed", "expected"), c(0:8, ">=9"))
+    res$P <- sum( (res$freq-res$E)^2/res$E ) # Pearson’s statistic
+    res$chisq_df <- length(res$categ) - 1 - length(res$fit@coef) # df
+    res$chisq_p <- pchisq(res$P, res$chisq_df, lower.tail = FALSE) # p-value
+
+    return(res)
+}
+```
+
+```{r, eval=TRUE, fig.align="center", fig.width=12}
+# Now run main function and print some resulsts
+
+rgfreq <- c(57, 203, 383, 525, 532, 408, 273, 139, 45, 43)
+rgcateg <- 0:9
+
+# likelihood function
+rgpois <- function(n, theta=1) {
+    lim <- 9 # limit
+    ifelse(n < lim,
+           # now evaluate m.g.f. at either main case
+           # for Pr(n), n = 0,...,8 take poisson m.g.f.
+           dpois(n, theta / 8), # 8-fold correction to scale theta for 1 min
+           # for Pr(n >= 9) get upper tail prob using c.d.f.
+           ppois(lim - 1, theta / 8, lower.tail=FALSE))
+}
+
+rgavg <- sum(rgfreq * rgcateg) / sum(rgfreq) # average num on 1/8 min scale
+rgsem <- sqrt(rgavg / sum(rgfreq)) # sem on 1/8 min scale
+rglim <- (rgavg + c(-3, 5) * rgsem) * 8 # scale to 1 min
+
+rg <- counts_likelihood(0:9, rgfreq, rgpois, rglim)
+```
+
+### M.l.e. and confidence intervals for $\theta$
+
+The **left graph** suggests that a quadratic function may be a good
+approximation to the log-likelihood of $\theta$.  The **right graph**
+indicates an even closer correspondence between $Z_2(\theta)$ and
+$Z_1(\theta)$ than in the case of the "group" data in the previous excercise.
+
+```{r, eval=TRUE}
+rg$fit@coef # theta hat, m.l.e. of theta
+rg$fit@vcov # variance of theta hat
+rg$CI95Z # 95% confidence interval based on thetahat
+lik.ci(rg$thetas, rg$L)
+```
+
+### Goodness of fit
+
+The rounded expected frequency vales are very close to the observed ones.
+Even then, the p-value of Pearson's statistic is small, only 0.116, showing
+how the large total number of observations makes the $\chi^2$ test quite
+selective.
+
+```{r, eval=TRUE}
+rg$P
+round(rg$OE) # compare observed and expected at each freq value
+rg$chisq_df # df
+pchisq(rg$P, rg$chisq_df, lower.tail = FALSE) # p-value / signif. level
+
+rm(list = grep("rg.", ls(),value=T)) # clean up
+```
+
+(Sections 4.1–4.4; Moore, 1952)
+
+
+## 5. Blood
+
+blood contains data on the incidence of blood groups O, A, B, and AB in 12
+different studies on people living in Britain or of British origin living
+elsewhere. To fit the single- locus model used in Example 4.38, we use the
+following code, which computes the fitted probabilities and then the negative
+log likelihood starting from $(\log \lambda_A, \log \lambda_B)$:
+
+```{r}
+blood5 <- list()
+
+blood5$make.prob <- function(log.lam)
+{
+    lamA <- exp(log.lam[1])
+    lamB <- exp(log.lam[2])
+    lamO <- 1-lamA-lamB
+    piA <- lamA*(lamA+2*lamO)
+    piB <- lamB*(lamB+2*lamO)
+    piAB <- 2*lamA*lamB
+    piO <- lamO^2
+    c(piO,piA,piB,piAB)
+}
+blood5$nlogL <- function(log.lam, y) -sum(y*log(blood5$make.prob(log.lam)))
+```
+
+To fit this to each of the studies separately:
+
+```{r}
+blood5$fits <- list(neg.loglik=rep(NA,12),lambda=matrix(NA,12,3),
+             fitted=matrix(NA,12,4))
+for (i in 1:nrow(SMPracticals::blood))
+{
+    blood5$fit <- nlm(blood5$nlogL, c(-1,-3),y=SMPracticals::blood[i,])
+    blood5$fits$neg.loglik[i] <- blood5$fit$minimum
+    blood5$fits$lambda[i,1:2] <- exp(blood5$fit$estimate)
+    blood5$fits$lambda[i,3] <- 1- sum(blood5$fits$lambda[i,-3])
+    blood5$fits$fitted[i,] <- sum(SMPracticals::blood[i,])*blood5$make.prob(blood5$fit$estimate)
+}
+blood5$fits
+```
+
+The overall $\chi$-squared statistic is computed by
+
+```{r}
+blood5$sepP <- sum((blood5$fits$fitted-SMPracticals::blood)^2/blood5$fits$fitted)
+```
+
+How many degrees of freedom has this?
+
+**Answer:** for each of the 12 studies, the number of parameters in the
+unconstrained multinomial model with parameters $\pi_A, \pi_B, \pi_{AB},
+\pi_0$ is $4 - 1 = 3$, whereas in the constrained model with parameters
+$\lambda_A, \lambda_B, \lambda_0$ is $3 - 1 = 2$.  For each study the degrees
+of freedom is the reduction of free parameters, which is $1$.  The whole set
+of studies may be considered as a large multinomial model, whose free
+parameters are the union of all 12 sets of parameters (both in the general and
+constrained case), so the number of free parameters (and equivalently the
+degrees of freedom) add up over the 12 studies.  Therefore the overall degrees
+of freedom is $12$.
+
+Does the model seem to fit?  To see a
+model with the same values of $\lambda_A, \lambda_B$ fitted to the entire
+dataset:
+
+**Answer:** the p-value of the Pearson statistic suggests a reasonable fit.
+
+```{r}
+(blood5$sepDF <- nrow(SMPracticals::blood) * (ncol(SMPracticals::blood) - 1 -
+                                             (ncol(blood5$fits$lambda)
+                                              - 1)))
+(blood5$sep_p <- pchisq(blood5$sepP, df=blood5$sepDF, lower.tail=FALSE))
+
+blood5$fit <- nlm(blood5$nlogL, c(-1,-3),y=apply(SMPracticals::blood,2,sum))
+
+blood5$totP <- 2*(blood5$fit$minimum-sum(blood5$fits$neg.loglik))
+```
+
+What does this last calculation give? Which model seems to fit best?
+
+**Answer:** here the Pearson statistic is calculated to compare the general
+multinomial model (which is the same as before) to a submodel, which is more
+strongly constrained than the one before.  In this submodel there is only one
+set of $\lambda_A, \lambda_B$, so the overall number of free parameters is
+only $2$, which leads to a larger degree of freedom $(36 - 2 = 34)$ than in
+the previous case.  This means that there is no variation of $\lambda_X$
+across studies.  The very small p-value suggests to reject this model.
+
+```{r}
+(blood5$totDF <- nrow(SMPracticals::blood) * (ncol(SMPracticals::blood) - 1) -
+                                             (ncol(blood5$fits$lambda)
+                                              - 1))
+(blood5$tot_p <- pchisq(blood5$totP, df=blood5$totDF, lower.tail=FALSE))
+rm(i)
+```
+
+(Chapter 4; Taylor and Prior, 1938)

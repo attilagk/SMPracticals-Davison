@@ -1,0 +1,366 @@
+# Uncertainty
+
+## 1. Half-normal distribution
+
+If $Z$ has the standard normal distribution, $W = |Z|$ has the half-normal
+distribution.  Show that $\Pr(W \leq w) = 2 \Phi (w) − 1$ for $w \geq 0$, and
+zero otherwise, and deduce that its $p$ quantile is $\Phi^{−1} (1/2 (1 + p))$.
+If $y_1 , \ldots, y_n$ is thought to be a random sample from the $N(0,
+\sigma^2)$ density and $n$ is small, it may be useful to replace a normal scores
+plot of the $y_j$ with a half-normal plot, i.e.  a plot of the ordered $|y_j
+|$ against half-normal plotting positions. How you would expect this to appear
+if the data were (i) normal, (ii) had heavier tails, and (iii) had lighter
+tails? To verify your conjectures:
+
+```{r, fig.width=12, fig.height=12, fig.align="center"}
+qqhnorm <- function(y, line=F, ...) {
+    y <- y[!is.na(y)] # drops any NAs
+    n <- length(y); i <- c(1:n); r <- range(c(y,0))
+    o <- qnorm(0.5*(1+i/(n+1)))
+    qqplot(o,y,ylim=r,xlab="Half-normal quantile",...)
+    if (is.numeric(line)) abline(0,line,lty=2)
+    invisible()
+}
+
+par(mfrow = c(2, 2), cex = 1)
+qqhnorm(abs(rnorm(20)), line=1, ylab="Normal data")
+qqhnorm(abs(rt(20,df=5)),line=1,ylab="t_5 data")
+qqhnorm(abs(rexp(20)-rexp(20)),line=1,ylab="Laplace data")
+qqhnorm(rgamma(20,2),line=1,ylab="Gamma(2) data")
+```
+
+### Conclusions
+
+The empirical distributions from the $t_5$ and the Laplace data both have
+heavier tails than does the normal distribution. This conclusion extends to
+"half-distributions" obtained by taking the absolute value of data points.
+The support of any Gamma distribution is nonnegative, so there's no need to
+take absolute values for that distribution.  Moreover, a Gamma with shape
+parameter 2 differs from the rest of the 3 distributions in this example in
+that it has a maximum at for some $y \gt 0$.
+
+
+## The $t$ statistic
+
+The $t$ statistic for a normal random sample was derived in 1908 by a mixture
+of simulation, mathematics and guesswork. Before arriving at a mathematical
+derivation, Student wrote measurements from 3000 criminals on pieces of card,
+shuffled them thoroughly, and divided them at random into 750 groups of size
+$n = 4$. He then calculated the average and sample variance, $\overline{Y}$
+and $S^2$, for each group and looked at their empirical distributions and that
+of $Z = n^{1/2} (Y − \mu)/S$; he assumed that μ equalled the average of all
+3000 observations. Finding that the fit of the t 3 density to the empirical
+distribution of $Z$ was excellent, he then set about a mathematical
+derivation.  We can mimic his simulation and check the distributions of
+$\overline{Y}$ , $S^2$ and $Z$ with much less effort:
+
+```{r}
+mystudent <- function(n=4, R=750, rangen=rnorm, ...) {
+    y <- matrix(rangen(n * R, ...),R,n)
+    ybar <- apply(y,1,mean)
+    s2 <- apply(y,1,var)
+    z <- ybar/sqrt(s2/n)
+    par(mfrow=c(2,2),pty="s", cex=1)
+    plot(ybar,s2,pch=".", log="y",
+         ylab = expression(S^2),
+         xlab = expression(bar(Y)),
+         main = expression(paste("Sample mean ", bar(Y), " and sample variance ", S^2)))
+    qqnorm(ybar,pch=".",
+           xlab = "normal quantiles",
+           ylab = expression(paste("ordered ", bar(Y))),
+           main = expression(paste("Distribution of ", bar(Y), " w.r.t. std. normal")))
+    abline(0,1/2,lty=2)
+    oc <- qchisq(c(1:R)/(R+1),df=n-1)
+    qqplot(oc,(n-1)*s2, pch=".",
+           xlab = expression(paste({Chi^2}[n-1], " quantiles")),
+           ylab = expression(paste("ordered ", S^2)),
+           main = expression(paste("Distribution of ", S^2, " w.r.t. ",
+                                   {Chi^2}[n-1])))
+    abline(0,1,lty=2)
+    ot <- qt(c(1:R)/(R+1),df=n-1)
+    qqplot(ot,z,pch=".",
+           xlab = expression(paste(t[n-1], " quantiles")),
+           ylab = expression(paste("ordered ", Z)),
+           main = expression(paste("Distribution of ",
+                           Z == n^{1/2} * (bar(Y) - mu) / S,
+                           " w.r.t. ", t[n-1])))
+           abline(0,1,lty=2)
+}
+```
+
+Does the upper left panel support independence of $\overline{Y}$ and $S^2$?
+With $Y_1 , \ldots, Y_n$ $\sim^{iid} N(0, 1)$ and $n = 4$, we have
+$\overline{Y}\sim N(0, 1/4)$, $3 S^2 \sim \chi^2_3$, and $Z \sim t_3$. Do the
+other panels support this?  To repeat your experiment with data from other
+densities, replace rnorm(n\*R) in the second line above with, for example,
+rt(n\*R,df=3) or rexp(n\*R).  Do $\overline{Y}$ and $S^2$ now seem correlated?
+How does the distribution of $Z$ change?  (Section 3.2; Student, 1908)
+
+### $n = 4$-sized samples from the std. normal distribution
+
+```{r, fig.width=12, fig.height=12, fig.align="center"}
+mystudent(rangen=rnorm)
+```
+
+The correlation between $\overline{Y}$ and $S^2$ seems close to zero
+suggesting independence.  The distribution of $\overline{Y}$ and $S^2$ is
+close to normal and $\chi^2_{3}$, respectively, as expected.  The studentized
+statistic $Z$ is distributed reasonably well as $t_3$, except for at the
+tails.  This discrepancy at the tails may be explained by the fact that $Z$ is
+calculated from both $\overline{Y}$ and $S^2$ and therefore contains two
+approximations instead of just one.
+ 
+### $n = 4$-sized samples from the $t_3$ distribution
+
+```{r, fig.width=12, fig.height=12, fig.align="center"}
+mystudent(rangen=rt, df=3)
+```
+
+The upper left plot suggest a positive, although weak, correlation between
+$|\overline{Y}|$ and $S^2$.  This may be explained by the fact that the $t_3$
+distribution has heavier tails than the normal and so samples even with just
+slightly higher $\overline{Y}$ have a much higher $\sum_j Y_j^2$ term, which
+therefore cannot be sufficiently offset by $n \overline{Y}$ during the
+calculation of $S^2 = (n-1)^{-1} \sum_j (Y_j - \overline{Y})^2 =  (n-1)^{-1}
+(\sum_j Y_j^2 - n \overline{Y}^2)$.
+
+As the upper right plot shows, the heavier tails of $t_3$ induce a greater
+variation of $\overline{Y}$ than a random variable $X \sim N(0, 1/4)$.
+Departure of $S^2$ from the $\chi^2_3$ distribution is even more pronounced
+(lower left) because of the squared $Y_j^2$ terms in $S^2$, which are much
+greater than the corresponding squared normal variable $X^2$.
+
+Despite the above discussed divergences of $\overline{Y}$ and $S^2$ from their
+theoretical distribution (corresponding to normality), the distribution of $Z$
+based on $t_3$ samples appears roughly as close to $t_3$ (lower right in the
+current figure) as the $Z$ based on normal samples (lower right panel in the
+previous figure).  This is because the divergence of $\overline{Y}$ from
+normal distribution is partially compensated by the divergence of $S^2$ from
+the $\chi^2_3$ distribution.
+
+Indeed, the average of a 4-sized sample $\overline{Y} = \sum_{j=1}^4 Y_j$ from
+a $t_3$ distribution corresponds to the average of a $4 \times 4 = 16$-sized
+sample $\overline{X} = \sum_{j=1}^{16} X_j$ from the standard normal
+distribution.  This means that sampling in two steps (taking a 4-sized sample
+of 4-sized samples) is equivalent to sampling in one step (taking a 16-sized
+sample).  In the lower right panel, however, the theoretical quantiles are
+derived from a $t_3$ instead of a $t_{15}$ distribution, so the degrees of
+freedom do not match, and the distribution of $Z$ diverges from the
+theoretical $t_3$.
+
+
+### $n = 4$-sized samples from the exponential distribution
+
+```{r, fig.width=12, fig.height=12, fig.align="center"}
+mystudent(rangen=rexp)
+```
+
+The upper left plot shows a strong postive correlation between $\overline{Y}$
+and $S^2$.  This can be explained using the same argument as in the case of
+the $t_3$ samples, noting that the exponential distribution is even longer
+right-tailed than the $t_3$.  The left tail of the exponential distribution,
+however, is missing since its pdf is monotonously decreasing and it is only
+supported in non-negative numbers: $Y \in [0, \infty)$.  For these reasons the
+shape of the Q-Q plot on the top right is both U-shaped and shifted to the top
+(cf dashed diagonal). This "U-shaped" divergence from normality is even more
+pronounced in the case of the $S^2$ statistic.  The lower right plot shows
+that, unlike in the case of $t_3$ samples, the $Z$ statistic far from $t_3$.
+This is due to the fact that $\overline{Y}$ is gamma distributed with shape
+parameter $\kappa = n = 4$, and that distribution is still far from a
+corresponding normal $N(\mu = \kappa / \lambda, \sigma^2 = \kappa /
+\lambda^2)$, where $\lambda$ is the rate parameter of both $Y$ and
+$\overline{Y}$.  Asymptotically (as $n \to \infty$), however, the distribution
+of $Z$ is normal.
+
+
+## Wiener process and Brownian motion
+
+Let $Y_1, \ldots, Y_n$ be a random sample from a distribution with zero mean
+and variance $\sigma^2$, and define $W_u = n^{−1} (Y_1 + \ldots + Y_{\lfloor
+nu \rfloor} )$, for $0 \lt u \le 1$. Let $0 \lt u_1 \lt \ldots \lt u_k \lt 1$.
+Show that as $n \to \infty$ the joint limiting distribution of $W_{u_1} ,
+W_{u_2} - W_{u_1}, \ldots, W_{1} - W_{u_k}$ is multivariate normal with mean
+zero and covariance matrix $\sigma^2 \mathrm{diag} (u_1 , u_2 − u_1, \ldots, 1 −
+u_k )$, and hence find the joint distribution of $W_{u_1} , W_{u_2}, \ldots,
+W_{u_k}, W_{u_1}$.
+
+This is the distribution of the points of a Wiener process
+$\{W_u \}$ with $W_0 = 0$.  The random process $\{W_u  \}$, $0 \lt u \le 1$
+given that $W_0 = W_1 = 0$ is called a Brownian bridge; denote it $\{B_u \}$.
+Thus $B_0 = B_1 = 0$. Show that the joint distribution of $B_{u_1}, \ldots,
+B_{u_k}$ is multivariate normal with mean zero and covariances given by
+$\mathrm{cov}(B_u , B_v ) =^D \sigma^2 u(1 − v), u \lt v$. Show also that $B_u =
+W_u − uW_1$.  To see what sample paths of a Wiener process and Brownian bridge
+look like when $\sigma = 1$, repeat the last three lines below a few times.
+
+```{r, fig.width=12, fig.height=7, fig.align="center"}
+par(cex=1, mfrow=c(1,2))
+wiener <- function(n) cumsum(rnorm(n))/sqrt(n)
+n <- 5000; u <- c(1:n)/n; w <- wiener(n); b <- w-u*w[n]
+plot(u,w,ylim=c(-2,2),type="l",ylab="Wiener process")
+abline(h=0, lty="dashed")
+plot(u,b,ylim=c(-2,2),type="l",ylab="Brownian bridge")
+abline(h=0, lty="dashed")
+```
+
+The sample paths are the limit of a random walk and are highly irregular: in
+fact they are continuous everywhere but nowhere differentiable.
+
+### Discussion
+
+Since $u_i \gt u_{i-1}$, there are infinite integers between $n u_i$ and $n
+u_{i-1}$ as $n \to \infty$.  Hence each $W_{u_i} - W_{u_i-1}$ is an average of
+an $n (u_i - u_{i-1}) \to \infty$-sized sample, so the central limit theorem
+applies to with mean zero and variance $n^{-1} (u_i - u_{i-1}) \sigma^2$,
+where the $(u_i - u_{i-1})$ factor represents the fact that only the $(u_i -
+u_{i-1})$ fraction of the $n$ number $Y_j$ were included in each $W_{u_i} -
+W_{u_i-1}$.  Moreover each $W_{u_i} - W_{u_i-1}$ corresponds to an independent
+subsample, therefore the off-diagonal elements of the covariance matrix are
+all zero.
+
+Independence does not apply to the joint distribution of $\{ W_{u_i} \}$
+because the sum of independent variables is not in general independent from
+those variables.  It can be seen from the left plot that each $W_{u_i}$
+strongly depends on the previous $W_{u_{i-1}}$.
+
+The joint distribution of $W_{u_1} , W_{u_2}, \ldots, W_{u_k}, W_{1}$ may be
+computed as follows.  Each $W_{u_i}$ is the linear combination $W_{u_{i-1}} +
+(W_{u_i} - W_{u_{i-1}})$, where the distribution of the parenthesized second
+term of the summation has already been determined (above), and the first term
+is also known for $i=1$. So the joint distribution can be obtained by
+successively calcuating each $W_{u_i}, i=1, \ldots, k+1$, where $W_{u_{k+1}} =
+W_1$.  This can be more compactly expressed using equation (3.22) on page 73.
+Let $X_{u_i} = W_{u_i}-W_{u_{i-1}} = \sigma^2 (u_i - u_{i-1}) Z_i$, where
+$Z_i$ is a standard normal variable.  Eq (3.22) says that $a + B^T Z \sim N_q
+(a + B^T, B^T \Omega B)$ in general.  Here $q = k + 1$, whereas $a$ is a
+$(k+1) \times 1$ null vector, $\Omega$ is a $(k+1) \times (k+1)$ identity
+matrix, and $B^T$ is a $(k+1) \times (k+1)$ lower triangular matrix with
+rows as follows: $(u_1^{1/2}, 0, 0, \ldots, 0), (u_1^{1/2}, (u_2 - u_1)^{1/2},
+0, \ldots, 0), \ldots (u_1^{1/2}, (u_2 - u_1)^{1/2}, (u_3 - u_2)^{1/2},
+\ldots, (1 - u_k)^{1/2})$. The lower triangluar character of $B^T$ encodes the
+successive summation of the sequence $\{ X_{u_i} \}, i = 1, ..., k+1$.  This
+results in a joint normal distribution with zero mean and covariance matrix
+$B^T \Omega B$ that induces strong correlation between successive $W_{u_i}$
+components.
+
+## Generating normal random vars. from the sum of uniform random vars.
+
+If $U \sim U(0, 1)$, show that its mean and variance are $1/2$ and $1/12$, and
+that all its odd moments are zero.
+
+### Demonstration
+
+$\mathrm{E} U = \int_0^1 u \mathrm{d}u = 1/2 \times 1^2$, and $\mathrm{var} U =
+\mathrm{E} [U^2] - (\mathrm{E} U)^2 = 1/3 \times 1^3 - (1/2)^2 = 1/12$.
+
+One approach to generating standard normal variables is to set $Z = U_1 +
+\ldots + U_{12} − 6$.  Explain the rationale behind this. To generate 10,000
+such Zs and see if they appear normal:
+
+
+```{r, fig.width=12, fig.height=7, fig.align="center"}
+u <- matrix(runif(12*10000),10000,12) # 10,000x12 matrix of Us
+z <- apply(u,1,sum)-6 # add across rows
+par(pty="s") # square plot
+qqnorm(z,pch=".",xlim=c(-4,4),ylim=c(-4,4))
+abline(0,1,lty=2)
+```
+
+### Discussion
+
+Evidently, $\mu = \mathrm{E} Z = 0$ and, since the variance of the sum of
+independent random variables $V_j$ is the sum of their variances, $\sigma^2 =
+\mathrm{var} Z = 1$.  The central limit applies to the sum of independent
+random variables such as $Z$ in this case.  This means that at $n=12$-sized
+samples the sum (equivalently the average) is approximately normally
+distributed.  The plot shows that the approximation is good.  However, extreme
+values of the normal distribution cannot be produced by the present method,
+since the support of $Z$ is finite, $[-6, 6]$, but that of any normal
+distributioin is $(- \infty, \infty)$.
+
+
+## Generating samples from a $t$ distribution
+
+Verify that the following code fragment does the calculations necessary for
+Example 3.24, with the simulations for the normal, gamma, and Cauchy cases.
+Check some of numbers in Table 3.2 of the book.
+
+```{r}
+cover.sim <- function(n, ran.gen=rnorm, a=c(0.95,0.975), R=1600, ...) {
+    z <- matrix( ran.gen(n*R,...),R,n) # n*R random numbers
+    zbar <- apply(z,1,mean) # sample average
+    sz <- sqrt(apply(z,1,var)) # sample std dev
+    t <- sqrt(n)*zbar/sz # studentized average
+    c1 <- c2 <- NULL
+    for (i in 1:length(a)) {
+        c1 <- c(c1,mean(t<qt(1-a[i],df=n-1))) # lower tail prob
+        c2 <- c(c2,mean(t<qt(a[i],df=n-1))) } # upper tail prob
+    res <- 100*matrix(rbind( c1, c2, c2-c1 ),nrow=1,byrow=F)
+    alphas <- unlist(lapply(a, function(x) c(1 - x, x, 2 * x - 1)))
+    colnames(res) <- as.character(100 * alphas)
+    rownames(res) <- "estimated prob."
+    return(res)
+}
+# some more distributions
+rgam <- function(n, shape ) rgamma(n,shape)-shape
+rmix <- function(n, p=0.1) rnorm(n,sd=sqrt(1+8*(runif(n)<p)))
+rlaplace <- function(n) rexp(n)-rexp(n)
+```
+
+Now do the calculations:
+
+### Normal sample
+
+```{r}
+cover.sim(10)
+```
+As expected, the estimated tail probabilities are close to the theoretical
+ones.
+
+### Gamma sample
+
+```{r}
+cover.sim(10, ran.gen=rgam, shape=2)
+```
+
+Because the gamma distribution with shape parameter 2 is extremely
+right-skewed, the sampe mean is also right-skewed (although less extremely so
+since averaging corresponds to increasing the shape parameter to $2 \times 10
+= 20$, which moves the gamma distribution closer to normality).  Consequently,
+more sample points are expected to fall below the lower confidence limit
+defined by the (symmetric) $t_{n-1}$ distribution than above the upper limit.
+
+### Cauchy sample
+
+```{r}
+cover.sim(10, ran.gen=rcauchy)
+```
+
+None of the moments are finite for the Chauchy distribution, therefore the
+central limit theorem, which requires $|\mu| \lt \infty$ and $0 \lt \sigma^2 \lt
+\infty$, does not hold.  Consequently, neither the sample average, nor the sample
+variance, nor the studentized sample mean are not distributed as normal,
+$\chi^2_{n-1}$ and $t_{n-1}$, respectively.
+
+### Sample from a mixture of normal distributions
+
+```{r}
+cover.sim(10, ran.gen=rmix, p=0.3)
+```
+
+"rmix" is a mixture of two normal distributions, one with unit variance an
+another one with $\sigma^2 = 9$.  This makes the tail of the distribution
+heavier, which in turn leads to greater sample variance $S^2$.  But greater
+$S^2$ results in a studentized sample average that is more narrowly
+distributed than that from a normal sample.  In other words, studentization
+overcompensates via division by a greater than expected $S^2$. Therefore, the
+estimated tail probabilities tend to be smaller.
+
+### Laplace sample
+
+```{r}
+cover.sim(10, ran.gen=rlaplace)
+```
+
+The same discussion can be presented here as in the case of the "rmix"
+distribution.

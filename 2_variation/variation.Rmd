@@ -1,0 +1,352 @@
+`r if (exists('.knitr.title')) I(paste('#', .knitr.title, sep = ''))`
+
+`r if (exists('.knitr.author')) I(.knitr.author)`
+
+```{r}
+opts_chunk$set(fig.align="center")
+```
+
+# Variation
+
+## 1. morley
+
+Dataframe morley contains data from the Michelson–Morley experiment on the
+speed of light. Twenty consecutive measurements were made during each of five
+experiments.
+
+### Shape of distribution
+
+To see the data, and make its histogram, empirical distribution function, and
+some boxplots:
+
+```{r}
+if (! "morley" %in% search())
+    attach(morley)
+histSpeed <- hist(Speed, plot = FALSE)
+ecdfSpeed <- ecdf(Speed)
+```
+
+```{r, fig.width=10, fig.height=10}
+par(mfrow = c(2, 2), cex=1)
+plot(histSpeed, main = "Histogram", freq = FALSE)
+curve(dnorm(x, mean=mean(Speed), sd=sd(Speed)), add = TRUE)
+plot(ecdfSpeed, do.points = FALSE, verticals = TRUE,
+     xlab = "Speed", ylab = "F(Speed)", main = "ECDF")
+boxplot(Speed ~ Expt, xlab = "Expt", ylab = "Speed", main = "Boxplot")
+qqnorm(Speed)
+qqline(Speed)
+```
+
+### Basic statistics
+
+```{r}
+summary(Speed) # summaries for all 100 observations
+mean(Speed)
+sqrt(var(Speed)) # one can calculate the sample sd like this
+sd(Speed) == sqrt(var(Speed)) # but there is a builtin function
+tapply(Speed,Expt,mean) # and for each experiment separately
+sqrt(tapply(Speed,Expt,var))
+```
+
+Compare the numbers below with the boxplot above:
+
+```{r results="markup"}
+tapply(Speed,Expt,summary)
+```
+
+Do you think there are differences among the experiments? Briefly summarize
+what you have discovered.
+
+### Sample independence
+
+As the observations were taken in time order within experiments, they may be
+dependent.  To see if this is the case, we make scatter plots of successive
+observations $(y_j, y_{j+1})$ for each series and give the correlation between
+$y_j$ and $y_{j+1}$:
+
+```{r, fig.width=10, fig.height=10}
+# This function reimplements Davison's, hopefully more clearly
+succ <- function(y) {
+    co <- cor(y[-1], y[-length(y)])
+    co <- round(co, 2)
+    plot(y[-1], y[-length(y)],
+         xlab = expression(y[j]), ylab = expression(y[j + 1]),
+         main = eval(substitute(expression(rho == co))))
+    invisible()
+}
+
+par(mfrow=c(2,3), cex=1)
+{lapply(split(Speed, Expt), succ); invisible()}
+```
+
+Do you think there is dependence between successive observations? If there is,
+how will it affect inferences for the true speed of light?  (Section 2.1)
+
+```{r morley-complex}
+detach(morley)
+```
+
+## 2. Mathmarks
+
+Dataframe mathmarks contains results for five mathematics exams for each of 88
+students.  To see and plot them:
+
+```{r}
+library(SMPracticals)
+data(mathmarks)
+sapply(mathmarks, mean)
+sapply(mathmarks, sd)
+math5 <- sapply(mathmarks, fivenum)
+row.names(math5) <- c("min", "1st quar", "median", "3rd quar", "max")
+math5
+boxplot(mathmarks)
+pairs(mathmarks)
+```
+
+## 3. Probability plots
+
+To get a feel for the information in a probability plot, here is a function to
+generate samples, standardize them and make a normal probability plot of them:
+
+```{r}
+tp <- function(n = c(5, 50, 500), ran.gen = rnorm, ...) {
+    randcall <- substitute(ran.gen(...))  # a call object for labeling
+    samples <- lapply(n, ran.gen, ...)
+    # helper function to calculate axis limits
+    getlims <- function(pooled, mean, sd) {
+        lim <- list()
+        lim$y <- c(min(pooled), max(pooled))
+        lim$x <- c(qnorm(pnorm(lim$y[1], mean=mean, sd=sd)),
+                   qnorm(pnorm(lim$y[2], mean=mean, sd=sd,
+                               lower.tail = FALSE), lower.tail = FALSE))
+        return(lim)
+    }
+    lim <- getlims(pooled <- unlist(samples), mean(pooled), sd(pooled))
+    # helper function
+    unitplot <- function(s) {
+        ssize <- length(s)
+        qqnorm(s, ylim=lim$y, xlim=lim$x, pch="+",
+               ylab = deparse(randcall),
+               main = eval(substitute(expression(n == ssize))))
+        qqline(s)
+    }
+    lapply(samples, unitplot)
+    invisible()
+}
+
+```
+
+### Effect of sample size and resampling
+
+(a) To produce plots for normal samples of sizes 5, 50 and 500:
+
+```{r, fig.width=10, fig.height=10,}
+par(mfrow = c(3, 3), cex=1)
+{replicate(3, tp(ran.gen=rnorm, mean=-3, sd=0.1)); invisible()}
+```
+
+### Sampling from non-normal distributions
+
+(b) To assess what happens for non-normal data, here are samples from the
+gamma distribution with shape parameter 4 and from the t distribution with 5
+degrees of freedom:
+
+```{r, fig.width=10, fig.height=10,}
+par(mfrow = c(3, 3), cex=1)
+{replicate(3, tp(ran.gen=rgamma, shape=4, scale=10)); invisible()}
+par(mfrow = c(3, 3), cex=1)
+{replicate(3, tp(ran.gen=rt, df=5)); invisible()}
+```
+
+### Effect of parameters
+
+Try each several times, with and without lines and with various values of
+shape and df.  Write a short summary of your findings.
+
+Normality increases with the shape parameter of gamma distribution (from top
+to bottom):
+
+```{r, fig.width=10, fig.height=10, results="hide", echo=FALSE}
+par(mfrow = c(3, 3), cex=1)
+tp(ran.gen=rgamma, shape=1, scale=10)
+tp(ran.gen=rgamma, shape=10, scale=10)
+tp(ran.gen=rgamma, shape=100, scale=10)
+```
+
+Normality increases with the degrees of freedom of Student's t distribution
+(from top to bottom):
+
+```{r, fig.width=10, fig.height=10, results="hide", echo=FALSE}
+par(mfrow = c(3, 3), cex=1)
+tp(ran.gen=rt, df=2)
+tp(ran.gen=rt, df=6)
+tp(ran.gen=rt, df=18)
+```
+
+### Recognizing distributions from QQ plots
+
+(\c) The function below generates data that are either (d1) normal, (d2)
+heavy-tailed, (d3) skewed, (d4) light-tailed, (d5) have outliers, or (d6)
+rounded.
+
+Alternative implementations and extensions to Davison's ran.gen function:
+
+```{r, fig.width=10, fig.height=10}
+# Returns a call object with the "i"th element of "rexpr" and parameters in
+# "param".
+call_rangen <- function(i = 1, param = list(n=100, m=5)) {
+    rexpr <- list(
+                  d1 = quote(rnorm(n)),
+                  d2 = quote(rt(n, df=m)),
+                  d3 = quote(rgamma(n, shape=m) / m),
+                  d4 = quote((rbeta(n, m, m) - 0.5) * m),
+                  d5 = quote(c(rnorm(n - m), rcauchy(m))),
+                  d6 = quote(round(m * rnorm(n)))
+                  )
+    le <- list(e = rexpr[[i]]) # store "i"th call object in a named list
+    # Outer substitute: symbol "e" for the "i"th call object in "le",
+    # resulting symbols "n" and (where applicable) "m".
+    # Inner substitute: symbols "n" and "m" for their numeric values in "param"
+    eval(substitute(substitute(e, param), le))
+}
+
+# Creates a single QQ plot for the "i"th distribution listed in "call_rangen".
+# Value: a call object corresponding to that distribution with parameters.
+qq1rangen <- function(i, param = list(n=100, m=5), guess=F, labchar=letters[i], ...) {
+    cl <- call_rangen(i, param)
+    samp <- eval(cl)
+    lab <- ifelse(guess, labchar, deparse(cl))
+    qqnorm(samp, main=lab, pch="+", ...)
+    qqline(samp)
+    cl
+}
+
+# For excercising the recognition of distributions from randomly arranged QQ
+# plots.  Use guess=FALSE to label each plot with the corresponding sampling
+# distribution.
+rangen_excercise <- function(param = list(n=500, m=5), guess=TRUE) {
+    permut <- 1:6
+    if(guess) permut <- sample(1:6, 6, replace = TRUE)
+    ans <- lapply(1:6, function(k)
+                  qq1rangen(permut[k], param=param,
+                            guess=guess, labchar=letters[k]))
+    names(ans) <- letters[1:6]
+    ans
+}
+```
+
+
+Labeled QQ plots for each samping distribution in the listed order:
+```{r, fig.width=12, fig.height=9}
+par(mfrow = c(2, 3), cex=1)
+ans <- rangen_excercise(param = list(n=100, m=5), guess=FALSE)
+```
+
+Which normal scores plot(s) correspond to which types of data? Type gen to see
+if you’re right. Try the last two lines again, with 50 replaced by 25, 100, or
+500.  Excercises generate unlabeled QQ plots in random order:
+
+```{r, fig.width=12, fig.height=9}
+par(mfrow = c(2, 3), cex=1)
+ans <- rangen_excercise(param = list(n=100, m=5), guess=TRUE)
+```
+
+Checking answers:
+```{r}
+ans
+```
+
+## 4. Existence of moments and asymptotic sample properties
+
+Make a Q-Q plot of 1000 Cauchy variables against 1000 averages of n = 1000
+Cauchy variables.  Repeat this a few times. Try also with n = 10, 100. Does
+this make any difference?
+
+```{r, fig.width=10, fig.height=10}
+# To make a Q-Q plot of 1000 Cauchy variables against 1000 averages of n =
+# 1000 Cauchy variables:
+gen_sample <- function(rdist=rcauchy, n=1000, R=1000, ...) {
+    m <- matrix(rdist(n * R), R, n)
+    y <- m[, 1]
+    ybar <- apply(m, 1, mean)
+    return(sam <- list(ybar = ybar, y = y))
+}
+
+qq4 <- function(sam, lim = NULL, ...) {
+    main <- "Close-up"
+    if(missing(lim)) {
+        lim <- range(sam$ybar)
+        main <- "Whole range"
+    }
+    qqplot(sam$ybar, sam$y, xlim=lim, ylim=lim, main=main,
+           xlab=expression(bar(y)), ylab=expression(y[1]), ...)
+    abline(0, 1)
+}
+
+qq4dual <- function(rdist=rcauchy, n=1000, ...) {
+    sam <- gen_sample(rdist=rdist, n=n, R=1000, ...)
+    qq4(sam, pch = "+")
+    qq4(sam, pch = "+", lim = quantile(sam$y, probs = c(0.025, 0.975)))
+}
+
+par(mfrow = c(2, 2), pty = "s", cex = 1)
+qq4dual(rcauchy, n=1000)
+qq4dual(rcauchy, n=10)
+```
+
+Do the same for normal and exponential variables, replacing rcauchy with rnorm
+and rexp.  What is the theoretical explanation?
+
+```{r, fig.width=10, fig.height=10}
+par(mfrow = c(2, 2), pty = "s", cex = 1)
+qq4dual(rnorm, n=1000)
+qq4dual(rnorm, n=10)
+par(mfrow = c(2, 2), pty = "s", cex = 1)
+qq4dual(rexp, n=1000)
+qq4dual(rexp, n=10)
+```
+
+## 5. Failure times
+
+Intervals between failures (hours of operating time) for air-conditioning
+equipment in a Boeing 720 jet aircraft were 555 320 56 104 220 239 47 246 176
+182 33 15 104 35.  If failures occur as a Poisson process while the planes are
+running, the intervals will be independent with a common exponential
+distribution.  Check this using an exponential probability plot, and give a
+graphical estimate of the average time between failures.
+
+```{r}
+qqexp <- function(sam, std = TRUE, ...) {
+    n <- length(sam) # sample size
+    scal <- ifelse(std, 1, mean(sam)) # estimated scale parameter
+    b <- ifelse(!std, 1, mean(sam)) # estimated scale parameter
+    qtl <- qexp((1:n) / (n + 1), rate = 1 / scal) # theoretical quantiles
+    l <- list(y = sort(sam), x = qtl)
+    plot(l, xlab = "Exponential plotting position", ...)
+    abline(0, b)
+}
+
+intervals <- c(55, 320, 56, 104, 220, 239, 47, 246, 176, 182, 33, 15, 104, 35)
+qqexp(intervals, std = FALSE, ylab = "Air-conditioning data")
+```
+
+
+## Colophon
+
+This report was automatically generated with the R package **knitr**
+(version `r packageVersion('knitr')`).
+
+```{r %sCHUNK_LABEL_HERE}
+```
+
+The R session information (including the OS info, R version and all
+packages used):
+
+```{r session-info, cache=FALSE}
+sessionInfo()
+Sys.time()
+```{r clean-up, include=FALSE}
+if (exists('.knitr.title')) rm(.knitr.author)
+if (exists('.knitr.author')) rm(.knitr.author)
+```
+
