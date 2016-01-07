@@ -6,7 +6,7 @@
 opts_chunk$set(fig.align="center")
 ```
 
-# Variation
+# Variation (Chapter 2)
 
 ## 1. morley
 
